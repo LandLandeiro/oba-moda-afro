@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Início - Loja Virtual{% endblock %}
+
+{% block content %}
+<section class="hero" style="{% if conteudo.imagem_hero %}background-image: url('{{ url_for('static', filename='uploads/' + conteudo.imagem_hero) }}');{% endif %}">
+    <div class="hero-content">
+        <h1>{{ conteudo.titulo_principal }}</h1>
+        <p>{{ conteudo.subtitulo }}</p>
+        <a href="{{ url_for('produtos') }}" class="btn btn-primary">Ver Produtos</a>
+    </div>
+</section>
+
+<section class="produtos-destaque">
+    <div class="container">
+        <h2>Produtos em Destaque</h2>
+        <div class="produtos-grid">
+            {% for produto in produtos %}
+            <div class="produto-card">
+                {% if produto.imagem %}
+                <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}" alt="{{ produto.nome }}">
+                {% else %}
+                <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" alt="{{ produto.nome }}">
+                {% endif %}
+                <h3>{{ produto.nome }}</h3>
+                <p class="preco">R$ {{ "%.2f"|format(produto.preco) }}</p>
+                <a href="{{ url_for('adicionar_carrinho', produto_id=produto.id) }}" class="btn btn-add">
+                    Adicionar ao Carrinho
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="sobre">
+    <div class="container">
+        <h2>{{ conteudo.sobre_titulo }}</h2>
+        <p>{{ conteudo.sobre_texto }}</p>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}Produtos - Loja Virtual{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Nossos Produtos</h1>
+    
+    <div class="produtos-grid">
+        {% for produto in produtos %}
+        <div class="produto-card">
+            {% if produto.imagem %}
+            <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}" alt="{{ produto.nome }}">
+            {% else %}
+            <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" alt="{{ produto.nome }}">
+            {% endif %}
+            <h3>{{ produto.nome }}</h3>
+            <p class="descricao">{{ produto.descricao }}</p>
+            <p class="preco">R$ {{ "%.2f"|format(produto.preco) }}</p>
+            {% if produto.estoque > 0 %}
+                <p class="estoque">Estoque: {{ produto.estoque }} unidades</p>
+                <a href="{{ url_for('adicionar_carrinho', produto_id=produto.id) }}" class="btn btn-add">
+                    Adicionar ao Carrinho
+                </a>
+            {% else %}
+                <p class="sem-estoque">Produto indisponível</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

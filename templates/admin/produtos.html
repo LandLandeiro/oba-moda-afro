@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciar Produtos - Admin{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-sidebar">
+        <h2>Administração</h2>
+        <ul>
+            <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+            <li><a href="{{ url_for('admin_produtos') }}" class="active">Produtos</a></li>
+            <li><a href="{{ url_for('admin_conteudo') }}">Conteúdo do Site</a></li>
+            <li><a href="{{ url_for('index') }}">Ver Site</a></li>
+        </ul>
+    </div>
+    
+    <div class="admin-content">
+        <div class="page-header">
+            <h1>Gerenciar Produtos</h1>
+            <a href="{{ url_for('admin_produto_novo') }}" class="btn btn-primary">Novo Produto</a>
+        </div>
+        
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Imagem</th>
+                    <th>Nome</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for produto in produtos %}
+                <tr>
+                    <td>{{ produto.id }}</td>
+                    <td>
+                        {% if produto.imagem %}
+                        <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}" class="table-img">
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td>{{ produto.nome }}</td>
+                    <td>R$ {{ "%.2f"|format(produto.preco) }}</td>
+                    <td>{{ produto.estoque }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if produto.ativo else 'danger' }}">
+                            {{ 'Ativo' if produto.ativo else 'Inativo' }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin_produto_editar', id=produto.id) }}" class="btn btn-sm">Editar</a>
+                        <a href="{{ url_for('admin_produto_deletar', id=produto.id) }}" 
+                           class="btn btn-sm btn-danger" 
+                           onclick="return confirm('Tem certeza que deseja deletar este produto?')">Deletar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

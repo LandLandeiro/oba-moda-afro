@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Carrinho - Loja Virtual{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="page-title">Meu Carrinho</h1>
+    
+    {% if itens %}
+    <div class="carrinho-container">
+        <table class="carrinho-table">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Preço</th>
+                    <th>Quantidade</th>
+                    <th>Subtotal</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in itens %}
+                <tr>
+                    <td>
+                        <div class="produto-info">
+                            {% if item.produto.imagem %}
+                            <img src="{{ url_for('static', filename='uploads/' + item.produto.imagem) }}" alt="{{ item.produto.nome }}" class="mini-img">
+                            {% endif %}
+                            <span>{{ item.produto.nome }}</span>
+                        </div>
+                    </td>
+                    <td>R$ {{ "%.2f"|format(item.produto.preco) }}</td>
+                    <td>
+                        <div class="quantidade-control">
+                            <a href="{{ url_for('atualizar_quantidade', produto_id=item.produto.id, quantidade=item.quantidade-1) }}" class="btn-qty">-</a>
+                            <span>{{ item.quantidade }}</span>
+                            <a href="{{ url_for('atualizar_quantidade', produto_id=item.produto.id, quantidade=item.quantidade+1) }}" class="btn-qty">+</a>
+                        </div>
+                    </td>
+                    <td class="subtotal">R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                    <td>
+                        <a href="{{ url_for('remover_carrinho', produto_id=item.produto.id) }}" class="btn-remove">Remover</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="carrinho-total">
+            <h2>Total: R$ {{ "%.2f"|format(total) }}</h2>
+            <a href="{{ url_for('finalizar_compra') }}" class="btn btn-primary btn-large">
+                Finalizar Compra pelo WhatsApp
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <div class="carrinho-vazio">
+        <p>Seu carrinho está vazio.</p>
+        <a href="{{ url_for('produtos') }}" class="btn btn-primary">Ver Produtos</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

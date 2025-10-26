@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ 'Editar' if produto else 'Novo' }} Produto - Admin{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-sidebar">
+        <h2>Administração</h2>
+        <ul>
+            <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
+            <li><a href="{{ url_for('admin_produtos') }}" class="active">Produtos</a></li>
+            <li><a href="{{ url_for('admin_conteudo') }}">Conteúdo do Site</a></li>
+            <li><a href="{{ url_for('index') }}">Ver Site</a></li>
+        </ul>
+    </div>
+    
+    <div class="admin-content">
+        <h1>{{ 'Editar' if produto else 'Novo' }} Produto</h1>
+        
+        <form method="POST" enctype="multipart/form-data" class="form-admin">
+            <div class="form-group">
+                <label for="nome">Nome do Produto:</label>
+                <input type="text" id="nome" name="nome" required 
+                       value="{{ produto.nome if produto else '' }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="descricao">Descrição:</label>
+                <textarea id="descricao" name="descricao" rows="4">{{ produto.descricao if produto else '' }}</textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="preco">Preço (R$):</label>
+                    <input type="number" id="preco" name="preco" step="0.01" required 
+                           value="{{ produto.preco if produto else '' }}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="estoque">Estoque:</label>
+                    <input type="number" id="estoque" name="estoque" 
+                           value="{{ produto.estoque if produto else 0 }}">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="imagem">Imagem do Produto:</label>
+                {% if produto and produto.imagem %}
+                <div class="current-image">
+                    <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}" alt="Imagem atual">
+                    <p>Imagem atual</p>
+                </div>
+                {% endif %}
+                <input type="file" id="imagem" name="imagem" accept="image/*">
+            </div>
+            
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="ativo" {{ 'checked' if not produto or produto.ativo else '' }}>
+                    Produto Ativo
+                </label>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Salvar</button>
+                <a href="{{ url_for('admin_produtos') }}" class="btn">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
