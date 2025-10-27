@@ -2,7 +2,29 @@
 from extensions import db
 from sqlalchemy.orm import relationship
 
-# --- Modelos existentes (sem alteração) ---
+# --- 1. NOVA TABELA DE ASSOCIAÇÃO (Muitos-para-Muitos) ---
+# Esta tabela "liga" produtos a categorias
+product_category_association = db.Table('product_category_association',
+    db.Column('product_id', db.Integer, db.ForeignKey('product.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+)
+
+# --- 2. MODELO DE CATEGORIA ATUALIZADO ---
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.Text, nullable=True)
+    
+    # Relação "muitos-para-muitos"
+    products = relationship('Product', 
+                            secondary=product_category_association,
+                            back_populates='categories')
+
+    def __str__(self):
+        return self.name
+
+# Modelos para o Header (sem alterações)
 class HeaderCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -10,6 +32,7 @@ class HeaderCategory(db.Model):
     order = db.Column(db.Integer, default=0)
     def __str__(self): return self.name
 
+# Modelos para as Categorias Circulares (Bolinhas) (sem alterações)
 class CircularCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -19,6 +42,7 @@ class CircularCategory(db.Model):
     section = db.Column(db.Integer, default=1) 
     def __str__(self): return f"{self.name} (Seção {self.section})"
 
+# Modelos para os Banners do Carrossel (sem alterações)
 class Banner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_url_desktop = db.Column(db.String(200), nullable=False)
@@ -29,47 +53,26 @@ class Banner(db.Model):
     order = db.Column(db.Integer, default=0)
     def __str__(self): return self.title or f"Banner {self.id}"
 
-class TextSection(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(50), unique=True, nullable=False, default='sobre-nos')
-    title = db.Column(db.String(150), nullable=False, default="Sobre Nós")
-    content = db.Column(db.Text, nullable=True)
-    def __str__(self): return self.title
-
-class FooterLink(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    url = db.Column(db.String(200), default="#")
-    order = db.Column(db.Integer, default=0)
-    column = db.Column(db.Integer, default=1)
-    def __str__(self): return f"{self.title} (Coluna {self.column})"
-
-# --- Modelos de Produto Modificados ---
-
-# Novo Modelo para Variações (Tamanho/Estoque)
-class Variation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    size = db.Column(db.String(50), nullable=False)  # Ex: "P", "M", "G", "38"
-    stock = db.Column(db.Integer, nullable=False, default=0)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
-    
-    def __str__(self):
-        return f"{self.product.name} - {self.size} ({self.stock} unid.)"
-
-# Modelo de Produto Atualizado
+# --- 3. MODELO DE PRODUTO ATUALIZADO ---
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
-    description = db.Column(db.Text, nullable=True) # Adicionado
+    description = db.Column(db.Text, nullable=True)
     price = db.Column(db.Float, nullable=False)
-    image = db.Column(db.String(200), nullable=True) # Renomeado de image_url e permite nulo
+    image = db.Column(db.String(200), nullable=True)
     slug = db.Column(db.String(150), unique=True, nullable=False)
-    active = db.Column(db.Boolean, default=True) # Adicionado
+    active = db.Column(db.Boolean, default=True)
 
-    # Relação com Variações
+    # --- REMOVIDO o 'category_id' e 'category' (um-para-muitos) ---
+    
+    # --- ADICIONADO o 'categories' (muitos-para-muitos) ---
+    categories = relationship('Category',
+                              secondary=product_category_association,
+                              back_populates='products')
+
+    # Relação com Variações (sem alterações)
     variations = relationship('Variation', backref='product', lazy=True, cascade='all, delete-orphan')
 
-    # Propriedade para calcular o estoque total
     @property
     def total_stock(self):
         if not self.variations:
@@ -79,15 +82,43 @@ class Product(db.Model):
     def __str__(self):
         return self.name
 
-# Modelos de Seção de Produto (mantidos para a index)
+# Novo Modelo para Variações (Tamanho/Estoque) (sem alterações)
+class Variation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    size = db.Column(db.String(50), nullable=False)
+    stock = db.Column(db.Integer, nullable=False, default=0)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    
+    def __str__(self):
+        return f"{self.product.name} - {self.size} ({self.stock} unid.)"
+
+# Tabela de associação (para seções da Home) (sem alterações)
 product_section_association = db.Table('product_section_association',
     db.Column('product_id', db.Integer, db.ForeignKey('product.id')),
     db.Column('section_id', db.Integer, db.ForeignKey('product_section.id'))
 )
 
+# Modelo para a Seção de Produtos (ex: "Destaques") (sem alterações)
 class ProductSection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False, default="Destaques")
-    products = relationship('Product', secondary=product_section_association,
-                            backref=db.backref('sections', lazy='dynamic'))
+    products = db.relationship('Product', secondary=product_section_association,
+                               backref=db.backref('sections', lazy='dynamic'))
     def __str__(self): return self.title
+
+# Modelo para Seções de Texto Genéricas (ex: "Sobre Nós") (sem alterações)
+class TextSection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False, default='sobre-nos')
+    title = db.Column(db.String(150), nullable=False, default="Sobre Nós")
+    content = db.Column(db.Text, nullable=True)
+    def __str__(self): return self.title
+
+# Modelo para Links do Footer (sem alterações)
+class FooterLink(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    url = db.Column(db.String(200), default="#")
+    order = db.Column(db.Integer, default=0)
+    column = db.Column(db.Integer, default=1)
+    def __str__(self): return f"{self.title} (Coluna {self.column})"

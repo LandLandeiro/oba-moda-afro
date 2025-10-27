@@ -22,13 +22,15 @@
             </button>
 
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav mb-2 mb-lg-0"> {% for cat in header_categories %}
+                <ul class="navbar-nav mb-2 mb-lg-0"> 
+                    {% for cat in header_categories %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ cat.url }}">{{ cat.name }}</a>
+                            <a class="nav-link" href="{{ cat.url if cat.url.startswith(('/', 'http')) else '/' + cat.url }}">{{ cat.name }}</a>
                         </li>
                     {% endfor %}
                 </ul>
             </div>
+
 
             <a href="{{ url_for('carrinho') }}" class="btn btn-link text-dark position-relative d-none d-lg-block">
                 <i class="bi bi-cart fs-4"></i>
@@ -63,19 +65,7 @@
     <footer class="footer-oba text-white pt-5 pb-3">
         <div class="container">
             <div class="row">
-                {% for col_num, links in footer_links.items() %}
-                <div class="col-md-3 col-6 mb-3">
-                    <h5>{{ links[0].title if links else '' }}</h5>
-                    <ul class="nav flex-column">
-                        {% for link in links %}
-                            <li class="nav-item mb-2">
-                                <a href="{{ link.url }}" class="nav-link p-0 text-white-50">{{ link.title }}</a>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endfor %}
-
+                
                 <div class="col-md-3 col-12 mb-3">
                     <h5>Contato</h5>
                     <ul class="nav flex-column">

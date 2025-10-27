@@ -1,12 +1,25 @@
 {% extends 'base.html' %}
 
-{% block title %}Todos os Produtos - Loja Virtual{% endblock %}
+{% block title %}{{ category.name }} - Obá Moda Afro{% endblock %}
 
 {% block content %}
 <div class="container py-5">
-    <h1 class="text-center mb-4 section-title">Todos os Produtos</h1>
+    
+    <div class="text-center mb-5">
+        <h1 class="section-title">{{ category.name }}</h1>
+        {% if category.description %}
+        <p class="lead text-muted">{{ category.description }}</p>
+        {% endif %}
+    </div>
     
     <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
+        
+        {% if not produtos %}
+        <div class="col-12">
+            <p class="text-center text-muted">Não há produtos nesta categoria no momento.</p>
+        </div>
+        {% endif %}
+
         {% for produto in produtos %}
         <div class="col">
             <div class="card product-card h-100 border-0">
@@ -14,7 +27,7 @@
                     {% if produto.image %}
                     <img src="{{ url_for('static', filename='uploads/' + produto.image) }}" class="card-img-top product-image-fixed-height" alt="{{ produto.name }}">
                     {% else %}
-                    <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" class="card-img-top product-image-fixed-height" alt="{{ product.name }}">
+                    <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" class="card-img-top product-image-fixed-height" alt="{{ produto.name }}">
                     {% endif %}
                 </a>
                 <div class="card-body text-center">
