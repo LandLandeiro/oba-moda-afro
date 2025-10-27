@@ -51,25 +51,37 @@
 <section class="container mb-5">
     <h2 class="text-center mb-4 section-title">{{ section.title }}</h2>
 
-    <div class="row row-cols-2 row-cols-lg-4 g-4"> {% for product in section.products[:4] %}
-        <div class="col">
-            <div class="card product-card h-100 border-0">
-                <a href="/produto/{{ product.slug }}">
-                    <img src="{{ url_for('static', filename='uploads/' + product.image_url) }}" class="card-img-top product-image-fixed-height" alt="{{ product.name }}">
-                </a>
-                <div class="card-body text-center">
-                    <h5 class="card-title fs-6">{{ product.name }}</h5>
-                    <p class="card-text fw-bold">R$ {{ "%.2f"|format(product.price)|replace('.', ',') }}</p>
-                    <a href="/adicionar-carrinho/{{ product.id }}" class="btn btn-primary btn-sm">Comprar</a>
+    <div class="product-section-carousel">
+        <div id="carousel-section-{{ section.id }}" class="carousel slide">
+            <div class="carousel-inner">
+                {% for product in section.products %}
+                {% set active_class = 'active' if loop.first else '' %}
+                
+                <div class="carousel-item {{ active_class }}">
+                    <div class="card product-card h-100 border-0">
+                        <a href="{{ url_for('produto_detalhe', slug=product.slug) }}">
+                            {% if product.image %}
+                            <img src="{{ url_for('static', filename='uploads/' + product.image) }}" class="card-img-top product-image-fixed-height" alt="{{ product.name }}">
+                            {% else %}
+                            <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" class="card-img-top product-image-fixed-height" alt="{{ product.name }}">
+                            {% endif %}
+                        </a>
+                        <div class="card-body text-center">
+                            <h5 class="card-title fs-6">
+                                <a href="{{ url_for('produto_detalhe', slug=product.slug) }}" class="text-decoration-none text-dark">{{ product.name }}</a>
+                            </h5>
+                            <p class="card-text fw-bold">R$ {{ "%.2f"|format(product.price)|replace('.', ',') }}</p>
+                            <a href="{{ url_for('produto_detalhe', slug=product.slug) }}" class="btn btn-primary btn-sm">Ver Opções</a>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-        </div>
-        {% endfor %}
-        
-    </div> </section>
+
+            </div>
+    </div>
+</section>
 {% endfor %}
-
-
 <section class="container py-4 section-circular-categories">
     <div class="d-flex flex-row flex-nowrap justify-content-center align-items-center text-center">
         {% for cat in circular_categories_2 %}

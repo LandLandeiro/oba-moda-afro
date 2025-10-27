@@ -1,66 +1,39 @@
 {% extends 'base.html' %}
 
-{% block title %}Gerenciar Produtos - Admin{% endblock %}
+{% block title %}Produtos - Loja Virtual{% endblock %}
 
 {% block content %}
-<div class="admin-container">
-    <div class="admin-sidebar">
-        <h2>Administração</h2>
-        <ul>
-            <li><a href="{{ url_for('admin_dashboard') }}">Dashboard</a></li>
-            <li><a href="{{ url_for('admin_produtos') }}" class="active">Produtos</a></li>
-            <li><a href="{{ url_for('admin_conteudo') }}">Conteúdo do Site</a></li>
-            <li><a href="{{ url_for('index') }}">Ver Site</a></li>
-        </ul>
-    </div>
+<div class="container py-5">
+    <h1 class="text-center mb-4 section-title">Nossos Produtos</h1>
     
-    <div class="admin-content">
-        <div class="page-header">
-            <h1>Gerenciar Produtos</h1>
-            <a href="{{ url_for('admin_produto_novo') }}" class="btn btn-primary">Novo Produto</a>
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
+        {% for produto in produtos %}
+        <div class="col">
+            <div class="card product-card h-100 border-0">
+                <a href="{{ url_for('produto_detalhe', slug=produto.slug) }}">
+                    {% if produto.image %}
+                    <img src="{{ url_for('static', filename='uploads/' + produto.image) }}" class="card-img-top product-image-fixed-height" alt="{{ produto.name }}">
+                    {% else %}
+                    <img src="https://via.placeholder.com/300x300?text=Sem+Imagem" class="card-img-top product-image-fixed-height" alt="{{ product.name }}">
+                    {% endif %}
+                </a>
+                <div class="card-body text-center">
+                    <h5 class="card-title fs-6">
+                        <a href="{{ url_for('produto_detalhe', slug=produto.slug) }}" class="text-decoration-none text-dark">{{ produto.name }}</a>
+                    </h5>
+                    <p class="card-text fw-bold">R$ {{ "%.2f"|format(produto.price)|replace('.', ',') }}</p>
+                    
+                    {% if produto.total_stock > 0 %}
+                        <a href="{{ url_for('produto_detalhe', slug=produto.slug) }}" class="btn btn-primary btn-sm">
+                            Ver Opções
+                        </a>
+                    {% else %}
+                        <p class="text-muted small">Produto indisponível</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Imagem</th>
-                    <th>Nome</th>
-                    <th>Preço</th>
-                    <th>Estoque</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for produto in produtos %}
-                <tr>
-                    <td>{{ produto.id }}</td>
-                    <td>
-                        {% if produto.imagem %}
-                        <img src="{{ url_for('static', filename='uploads/' + produto.imagem) }}" class="table-img">
-                        {% else %}
-                        -
-                        {% endif %}
-                    </td>
-                    <td>{{ produto.nome }}</td>
-                    <td>R$ {{ "%.2f"|format(produto.preco) }}</td>
-                    <td>{{ produto.estoque }}</td>
-                    <td>
-                        <span class="badge badge-{{ 'success' if produto.ativo else 'danger' }}">
-                            {{ 'Ativo' if produto.ativo else 'Inativo' }}
-                        </span>
-                    </td>
-                    <td>
-                        <a href="{{ url_for('admin_produto_editar', id=produto.id) }}" class="btn btn-sm">Editar</a>
-                        <a href="{{ url_for('admin_produto_deletar', id=produto.id) }}" 
-                           class="btn btn-sm btn-danger" 
-                           onclick="return confirm('Tem certeza que deseja deletar este produto?')">Deletar</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% endfor %}
     </div>
 </div>
 {% endblock %}
