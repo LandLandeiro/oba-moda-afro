@@ -27,25 +27,32 @@
             {% if produto.total_stock > 0 %}
             <form action="{{ url_for('adicionar_carrinho', produto_id=produto.id) }}" method="POST">
                 
-                <div class="form-group mb-3">
-                    <label for="variation-select" class="form-label fw-bold">Selecione o Tamanho:</label>
-                    <select class="form-select" id="variation-select" name="variation_id" required>
-                        <option value="" disabled selected>Escolha um tamanho</option>
-                        {% for var in produto.variations %}
-                            {% if var.stock > 0 %}
-                                <option value="{{ var.id }}" data-stock="{{ var.stock }}">
-                                    {{ var.size }} ({{ var.stock }} em estoque)
-                                </option>
-                            {% else %}
-                                <option value="{{ var.id }}" disabled>
-                                    {{ var.size }} (Esgotado)
-                                </option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
+                <div class="row">
+                    <div class="form-group mb-3 col-md-8">
+                        <label for="variation-select" class="form-label fw-bold">Selecione o Tamanho:</label>
+                        <select class="form-select" id="variation-select" name="variation_id" required>
+                            <option value="" disabled selected>Escolha um tamanho</option>
+                            {% for var in produto.variations %}
+                                {% if var.stock > 0 %}
+                                    <option value="{{ var.id }}" data-stock="{{ var.stock }}">
+                                        {{ var.size }} ({{ var.stock }} em estoque)
+                                    </option>
+                                {% else %}
+                                    <option value="{{ var.id }}" disabled>
+                                        {{ var.size }} (Esgotado)
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group mb-3 col-md-4">
+                        <label for="quantity-input" class="form-label fw-bold">Quantidade:</label>
+                        <input type="number" class="form-control" id="quantity-input" name="quantity" value="1" min="1" max="1" required disabled>
+                    </div>
                 </div>
                 
-                <p id="stock-info" class="text-muted"></p> <button type="submit" class="btn btn-primary btn-lg w-100">
+                <p id="stock-info" class="text-muted"></p> <button type="submit" class="btn btn-primary btn-lg w-100" id="add-to-cart-btn" disabled>
                     Adicionar ao Carrinho
                 </button>
             </form>
@@ -54,12 +61,15 @@
             {% endif %}
         </div>
     </div>
-</div>
+</div> 
+
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const select = document.getElementById('variation-select');
     const stockInfo = document.getElementById('stock-info');
+    const quantityInput = document.getElementById('quantity-input');
+    const addToCartBtn = document.getElementById('add-to-cart-btn');
     
     if (select) {
         select.addEventListener('change', function() {
@@ -67,8 +77,21 @@ document.addEventListener('DOMContentLoaded', function() {
             const stock = selectedOption.getAttribute('data-stock');
             
             if (stock) {
+                // Atualiza o input de quantidade
+                quantityInput.disabled = false;
+                quantityInput.max = stock;
+                if (parseInt(quantityInput.value) > stock) {
+                    quantityInput.value = stock;
+                }
+                
+                // Atualiza o botão
+                addToCartBtn.disabled = false;
+                
+                // Atualiza o texto de info
                 stockInfo.textContent = `Estoque disponível: ${stock} unidades`;
             } else {
+                quantityInput.disabled = true;
+                addToCartBtn.disabled = true;
                 stockInfo.textContent = '';
             }
         });
