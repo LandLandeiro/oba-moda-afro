@@ -3,8 +3,6 @@ from flask import Flask, render_template
 from extensions import db
 from admin import init_admin
 from flask_ckeditor import CKEditor
-# Importar Babel (se ainda estiver instalado, senão remova)
-# from flask_babel import Babel
 import math
 import os
 import datetime
@@ -13,8 +11,6 @@ import datetime
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_path = os.path.join(basedir, 'oba_afro.db')
 upload_folder = os.path.join(basedir, 'static', 'uploads')
-
-# babel = Babel() # Mantenha comentado ou remova
 
 def create_app():
     app = Flask(__name__)
@@ -58,6 +54,7 @@ def create_app():
         circular_categories_2 = CircularCategory.query.filter_by(section=2).order_by(CircularCategory.order).all()
         about_section = TextSection.query.filter_by(key='sobre-nos').first()
         footer_links = {}
+        
         # Consulta FooterLink apenas se o modelo ainda existir
         if 'FooterLink' in db.Model.metadata.tables: # Verifica se a tabela existe
              links = FooterLink.query.order_by(FooterLink.column, FooterLink.order).all()
@@ -65,6 +62,7 @@ def create_app():
                  if link.column not in footer_links:
                      footer_links[link.column] = []
                  footer_links[link.column].append(link)
+        
         # Se FooterLink foi removido, passa um dicionário vazio
         else:
             footer_links = {}

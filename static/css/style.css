@@ -280,3 +280,42 @@ body {
         right: 0px;
     }
 }
+
+/* ================================================== */
+/* === AJUSTE PARA CENTRALIZAR NAVBAR (NOVO CÓDIGO) === */
+/* ================================================== */
+
+/* Aplicar apenas em telas grandes (desktop), onde a navbar é expandida */
+@media (min-width: 992px) { /* 992px é o breakpoint 'lg' do Bootstrap */
+
+    /* 1. Torna o container da navbar o 'contexto' para o posicionamento */
+    .navbar > .container {
+        position: relative;
+    }
+    
+    /* 2. Remove a capacidade do 'bloco de links' de crescer.
+          Isso é necessário para que a 'ul' possa ser posicionada
+          corretamente de forma absoluta. */
+    .navbar .navbar-collapse {
+        flex-grow: 0 !important; 
+    }
+
+    /* 3. Posiciona a lista de links (ul) absolutamente no centro */
+    .navbar .navbar-nav {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+
+        /* Sobrescreve o 'mx-auto' do Bootstrap, que não é mais necessário */
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    /* ================================================== */
+    /* === 4. (NOVO) AUMENTA O ESPAÇAMENTO DOS LINKS === */
+    /* ================================================== */
+    .navbar .navbar-nav .nav-link {
+        padding-left: 1.5rem;  /* Padrão do Bootstrap é 1rem */
+        padding-right: 1.5rem; /* Padrão do Bootstrap é 1rem */
+    }
+}
