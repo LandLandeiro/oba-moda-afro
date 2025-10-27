@@ -1,15 +1,5 @@
-Okay, Lucca\! Entendido. Você quer um `README.md` no estilo detalhado do exemplo que você me mostrou, mas aplicado ao seu projeto `oba-moda-afro`.
-
-Preparei um `README.md` nesse formato, explicando as funcionalidades, a estrutura, as tecnologias e incluindo trechos de código relevantes do seu projeto, assim como o exemplo fazia.
-
------
-
-Aqui está o conteúdo para o seu `README.md`:
-
 ```markdown
 # Obá Moda Afro - Loja Virtual Flask
-
-![Obá Moda Afro Logo (Opcional)](/path/to/your/logo.png)
 
 Sistema completo de e-commerce desenvolvido com o framework Flask em Python para a marca Obá Moda Afro. Possui uma interface pública moderna para clientes e um painel administrativo robusto (Flask-Admin) para gerenciamento da loja.
 
