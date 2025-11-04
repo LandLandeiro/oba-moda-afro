@@ -1,6 +1,6 @@
 # app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from extensions import db
+from extensions import db, login_manager, bcrypt
 from admin import init_admin
 from flask_ckeditor import CKEditor
 import math
@@ -8,6 +8,7 @@ import os
 import datetime
 from sqlalchemy import not_
 from urllib.parse import quote_plus as url_escape 
+from flask_login import login_user, logout_user, current_user
 
 WHATSAPP_NUMBER = '+5515997479931' 
 
@@ -22,26 +23,34 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = 'uma-chave-secreta-muito-forte' 
     app.config['UPLOAD_FOLDER'] = upload_folder
-    app.config['FLASK_ADMIN_SWATCH'] = 'flatly'
+    app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
     app.config['FLASK_ADMIN_EXTRA_CSS'] = ['css/admin_custom.css']
 
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder)
 
     db.init_app(app)
+    login_manager.init_app(app)
+    bcrypt.init_app(app)
     CKEditor(app)
     init_admin(app) 
 
     from models import (HeaderCategory, CircularCategory, Banner, Product, 
-                        ProductSection, TextSection, Variation, # FooterLink removido
-                        Category
+                        ProductSection, TextSection, Variation,
+                        Category,
+                        User,
+                        FooterLink,
+                        Order, SiteStat
                         )
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        """Função que o Flask-Login usa para recarregar o usuário da sessão."""
+        return User.query.get(int(user_id))
 
     @app.context_processor
     def inject_global_data():
         header_categories = HeaderCategory.query.order_by(HeaderCategory.order).all()
-        
-        # --- LÓGICA DO 'footer_links' REMOVIDA DAQUI ---
         
         cart = session.get('cart', {})
         cart_item_count = sum(cart.values()) 
@@ -51,16 +60,36 @@ def create_app():
         return {
             'now': datetime.datetime.now(),
             'header_categories': header_categories,
-            # 'footer_links': footer_links, <-- REMOVIDO
             'math': math,
             'cart_item_count': cart_item_count,
-            'all_categories': all_categories 
+            'all_categories': all_categories, 
+            'current_user': current_user
         }
-
-    # ... (O resto do app.py não muda) ...
+    def get_stat(key):
+        """Busca ou cria uma estatística e retorna o objeto."""
+        stat = SiteStat.query.filter_by(key=key).first()
+        if not stat:
+            stat = SiteStat(key=key, value=0)
+            db.session.add(stat)
+            # Tenta salvar imediatamente
+            try:
+                db.session.commit()
+            except:
+                db.session.rollback()
+                stat = SiteStat.query.filter_by(key=key).first()
+        return stat
+    
+    # --- Rotas da Loja ---
 
     @app.route('/')
     def index():
+        try:
+            stat = get_stat('total_visitas')
+            stat.value += 1
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erro ao contar visita: {e}")
         circular_categories_1 = CircularCategory.query.filter_by(section=1).order_by(CircularCategory.order).all()
         banners = Banner.query.order_by(Banner.order).all()
         product_sections = ProductSection.query.all()
@@ -93,6 +122,16 @@ def create_app():
     @app.route('/produto/<slug>')
     def produto_detalhe(slug):
         produto = Product.query.filter_by(slug=slug, active=True).first_or_404()
+        
+        # --- RASTREAMENTO DE VISUALIZAÇÃO DE PRODUTO ---
+        try:
+            produto.view_count += 1
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Erro ao contar view do produto: {e}")
+        # --- FIM DO RASTREAMENTO ---
+
         return render_template(
             'produto_detalhe.html', 
             produto=produto
@@ -103,9 +142,13 @@ def create_app():
         cart_session = session.get('cart', {})
         cart_items = []
         total_price = 0
+        
+        # Não vamos mais gerar a URL do zap aqui.
+        # Vamos gerar apenas o texto.
         whatsapp_message_lines = ["Olá! Gostaria de fazer o seguinte pedido:\n"]
         
         for var_id_str, quantity in cart_session.items():
+            # ... (código para calcular cart_items e total_price) ...
             variation = Variation.query.get(var_id_str)
             if variation:
                 product = variation.product
@@ -118,49 +161,118 @@ def create_app():
                     'quantity': quantity,
                     'subtotal': subtotal
                 })
-                
+                # Adiciona ao texto da mensagem
                 whatsapp_message_lines.append(
                     f"- {quantity}x {product.name} (Tamanho: {variation.size}) - R$ {subtotal:.2f}"
                 )
 
         whatsapp_message_lines.append(f"\n*Total: R$ {total_price:.2f}*")
-        whatsapp_message = "\n".join(whatsapp_message_lines)
-        whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={url_escape(whatsapp_message)}"
         
+        # Salva o texto da mensagem na sessão para a próxima rota usar
+        session['whatsapp_message'] = "\n".join(whatsapp_message_lines)
+        
+        return render_template(
+            'carrinho.html', 
+            cart_items=cart_items, 
+            total_price=total_price
+            # Removemos o whatsapp_url daqui
+        )
         return render_template(
             'carrinho.html', 
             cart_items=cart_items, 
             total_price=total_price,
             whatsapp_url=whatsapp_url
         )
+    
+    @app.route('/checkout/criar-pedido', methods=['POST'])
+    def criar_pedido():
+        """
+        Esta rota é chamada quando o usuário clica em "Finalizar Pedido".
+        Ela cria o "Lead" (Pedido) no banco antes de redirecionar ao WhatsApp.
+        """
+        cart_session = session.get('cart', {})
+        whatsapp_message = session.get('whatsapp_message', 'Erro: Carrinho vazio.')
+        
+        if not cart_session:
+            flash('Seu carrinho está vazio.', 'warning')
+            return redirect(url_for('carrinho'))
 
+        # Recalcula o preço total para segurança
+        total_price = 0
+        items_summary_list = []
+        for var_id_str, quantity in cart_session.items():
+            variation = Variation.query.get(var_id_str)
+            if variation:
+                total_price += variation.product.price * quantity
+                items_summary_list.append(f"{quantity}x {variation.product.name} ({variation.size})")
+
+        items_summary_text = ", ".join(items_summary_list)
+        whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={url_escape(whatsapp_message)}"
+        
+        # 1. Cria o Pedido (Lead) no banco de dados
+        novo_pedido = Order(
+            total_price=total_price,
+            items_summary=items_summary_text,
+            whatsapp_url=whatsapp_url
+        )
+        db.session.add(novo_pedido)
+        
+        # 2. Incrementa a estatística de "checkout"
+        stat = get_stat('total_checkouts_whatsapp')
+        stat.value += 1
+        
+        db.session.commit()
+        
+        # 3. Limpa o carrinho
+        session.pop('cart', None)
+        session.pop('whatsapp_message', None)
+        session.modified = True
+        
+        # 4. Redireciona o usuário para o WhatsApp
+        flash('Seu pedido foi registrado! Estamos te redirecionando para o WhatsApp.', 'success')
+        return redirect(whatsapp_url)
+    
     @app.route('/carrinho/adicionar/<int:produto_id>', methods=['POST'])
     def adicionar_carrinho(produto_id):
         if 'cart' not in session:
             session['cart'] = {}
+        
         variation_id = request.form.get('variation_id')
-        produto = Product.query.get_or_404(produto_id)
+        produto = Product.query.get_or_404(produto_id) # <-- Já busca o produto
+
         if not variation_id:
              flash('Por favor, selecione um tamanho.', 'danger')
              return redirect(url_for('produto_detalhe', slug=produto.slug))
-        try:
-            quantity = int(request.form.get('quantity', 1))
-            if quantity < 1: quantity = 1
-        except (ValueError, TypeError):
-            quantity = 1
+        
+        # ... (try/except para quantity) ...
+        quantity = 1 # (seu código de quantity)
+
         variacao = Variation.query.get(variation_id)
         if not variacao or variacao.product_id != produto.id:
             flash('Variação inválida.', 'danger')
             return redirect(url_for('produto_detalhe', slug=produto.slug))
+
         var_id_str = str(variation_id)
         current_in_cart = session['cart'].get(var_id_str, 0)
         total_wanted = current_in_cart + quantity
+
         if total_wanted > variacao.stock:
             flash(f'Desculpe, temos apenas {variacao.stock} unidades de {produto.name} ({variacao.size}) em estoque.', 'danger')
         else:
             session['cart'][var_id_str] = total_wanted
             session.modified = True 
+            
+            # --- ADICIONADO: Rastreamento de Adição ao Carrinho ---
+            try:
+                produto.cart_add_count += 1
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"Erro ao salvar contagem de carrinho: {e}")
+            # --- FIM DA ADIÇÃO ---
+            
             flash(f'{quantity}x {produto.name} ({variacao.size}) adicionado ao carrinho!', 'success')
+            
         return redirect(url_for('carrinho'))
 
     @app.route('/carrinho/atualizar', methods=['POST'])
@@ -194,6 +306,40 @@ def create_app():
             flash('Item removido do carrinho.', 'success')
         return redirect(url_for('carrinho'))
 
+    # --- Rotas de Autenticação (Login/Logout) ---
+
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        # Se o usuário já estiver logado, redireciona para o admin
+        if current_user.is_authenticated:
+            return redirect(url_for('admin.index'))
+        
+        if request.method == 'POST':
+            email = request.form.get('email')
+            senha = request.form.get('senha')
+                
+            # Busca o usuário pelo email
+            user = User.query.filter_by(email=email).first()
+                
+            # Verifica se o usuário existe e se a senha está correta
+            if user and user.check_password(senha):
+                login_user(user) # <-- Função do Flask-Login que cria a sessão
+                    
+                # Redireciona para a página 'next' se ela existir (ex: /admin)
+                next_page = request.args.get('next')
+                return redirect(next_page or url_for('admin.index'))
+            else:
+                flash('Email ou senha inválidos. Tente novamente.', 'danger')
+                    
+        return render_template('login.html') # <-- Renderiza seu login.html
+
+    @app.route('/logout')
+    def logout():
+        logout_user() # <-- Função do Flask-Login que limpa a sessão
+        flash('Você saiu da sua conta.', 'success')
+        return redirect(url_for('login'))
+
+    # --- Fim da Função create_app ---
     return app
 
 # --- Bloco de Execução Principal ---
@@ -201,4 +347,4 @@ if __name__ == '__main__':
     app = create_app()
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

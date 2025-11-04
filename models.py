@@ -1,6 +1,8 @@
 # models.py
-from extensions import db
+from extensions import db, bcrypt
 from sqlalchemy.orm import relationship
+from flask_login import UserMixin
+import datetime
 
 # --- 1. NOVA TABELA DE ASSOCIAÇÃO (Muitos-para-Muitos) ---
 # Esta tabela "liga" produtos a categorias
@@ -28,29 +30,45 @@ class Category(db.Model):
 class HeaderCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    url = db.Column(db.String(200), nullable=False, default="#")
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     order = db.Column(db.Integer, default=0)
     def __str__(self): return self.name
+    category = db.relationship('Category', backref='header_links', lazy=True)
 
+    def __str__(self):
+        # Mostra o nome da categoria se estiver vinculada
+        if self.category:
+            return f"{self.name} (Links para: {self.category.name})"
+        return self.name
+    
 # Modelos para as Categorias Circulares (Bolinhas) (sem alterações)
 class CircularCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     image_url = db.Column(db.String(200), nullable=False)
-    link_url = db.Column(db.String(200), default="#")
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
+    category = db.relationship('Category', backref='circular_links', lazy=True)
     order = db.Column(db.Integer, default=0)
     section = db.Column(db.Integer, default=1) 
     def __str__(self): return f"{self.name} (Seção {self.section})"
+
+    def __str__(self):
+        # Mostra o nome da categoria se estiver vinculada
+        if self.category:
+            return f"{self.name} (Link: {self.category.name}) (Seção {self.section})"
+        return f"{self.name} (Seção {self.section})"
 
 # Modelos para os Banners do Carrossel (sem alterações)
 class Banner(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     image_url_desktop = db.Column(db.String(200), nullable=False)
     image_url_mobile = db.Column(db.String(200), nullable=True)
-    link_url = db.Column(db.String(200), default="#")
+    link_url = db.Column(db.String(200), default="#", nullable=True)
     title = db.Column(db.String(150))
     subtitle = db.Column(db.String(200))
     order = db.Column(db.Integer, default=0)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+    product = db.relationship('Product', backref='banners', lazy=True)
     def __str__(self): return self.title or f"Banner {self.id}"
 
 # --- 3. MODELO DE PRODUTO ATUALIZADO ---
@@ -62,8 +80,12 @@ class Product(db.Model):
     image = db.Column(db.String(200), nullable=True)
     slug = db.Column(db.String(150), unique=True, nullable=False)
     active = db.Column(db.Boolean, default=True)
+    cart_add_count = db.Column(db.Integer, default=0)
 
-    # --- REMOVIDO o 'category_id' e 'category' (um-para-muitos) ---
+    view_count = db.Column(db.Integer, default=0) 
+    
+    categories = relationship('Category', ...)
+    variations = relationship('Variation', ...)
     
     # --- ADICIONADO o 'categories' (muitos-para-muitos) ---
     categories = relationship('Category',
@@ -122,3 +144,46 @@ class FooterLink(db.Model):
     order = db.Column(db.Integer, default=0)
     column = db.Column(db.Integer, default=1)
     def __str__(self): return f"{self.title} (Coluna {self.column})"
+
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now)
+    total_price = db.Column(db.Float, nullable=False)
+    
+    # Salva os itens do carrinho como um texto simples
+    items_summary = db.Column(db.Text, nullable=True) 
+    
+    # Gera uma URL do WhatsApp para referência
+    whatsapp_url = db.Column(db.String(1000), nullable=True)
+
+    status = db.Column(db.String(30), nullable=False, default='Pendente')
+
+    def __str__(self):
+        return f"Pedido #{self.id} - R${self.total_price:.2f} ({self.status})"
+
+# --- NOVO MODELO 2: Estatísticas do Site ---
+# Um lugar simples para guardar contadores (ex: "total_visitas")
+class SiteStat(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(50), unique=True, nullable=False)
+    value = db.Column(db.Integer, default=0)
+
+    def __str__(self):
+        return f"{self.key}: {self.value}"
+
+# --- 4. MODELO DE USUÁRIO PARA AUTENTICAÇÃO ---
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+
+    def set_password(self, password):
+        """Cria um hash seguro para a senha."""
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        """Verifica se a senha fornecida corresponde ao hash."""
+        return bcrypt.check_password_hash(self.password_hash, password)
+
+    def __str__(self):
+        return self.email

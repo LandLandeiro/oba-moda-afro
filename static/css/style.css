@@ -347,3 +347,92 @@ body {
     margin-top: -10px;
     margin-bottom: 15px;
 }
+body.login-body {
+    background-color: #f8f9fa; /* Um cinza bem claro da paleta do Bootstrap */
+}
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center; /* Centraliza verticalmente */
+}
+
+.login-card {
+    border: none;
+    border-radius: 10px;
+    /* Adiciona a cor da marca como uma borda no topo */
+    border-top: 5px solid var(--oba-orange); 
+}
+
+.login-title {
+    color: var(--oba-dark-brown); /* Cor do seu CSS */
+    font-weight: 700;
+}
+
+/* Botão de login personalizado */
+.btn-login {
+    background-color: var(--oba-orange); /* Cor do seu CSS */
+    border-color: var(--oba-orange); /* Cor do seu CSS */
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn-login:hover {
+    background-color: var(--oba-brown); /* Cor do seu CSS */
+    border-color: var(--oba-brown); /* Cor do seu CSS */
+    color: white;
+}
+/* ================================================== */
+/* === AJUSTE CARROSSEL BANNER (HOME) === */
+/* ================================================== */
+
+/* 1. Este é o container que segura o carrossel */
+#bannerCarousel {
+    /* * Respeita o seu pedido de 900px, mas 'max-width' 
+     * permite que ele diminua em telas menores (responsivo).
+     */
+    max-width: 900px;
+    
+    /* Centraliza o carrossel na página se a tela for maior que 900px */
+    margin-left: auto;
+    margin-right: auto;
+    
+    /* Adiciona uma aparência de "cartão" */
+    border-radius: 12px;
+    overflow: hidden; /* Essencial para o border-radius funcionar na imagem */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* 2. Este é o "slide" individual (o <div> que contém a <img>) */
+#bannerCarousel .carousel-item {
+    /* * Altura para telas pequenas (Mobile). 
+     * 420px é muito alto para um celular. Vamos usar 350px.
+     */
+    height: 350px; 
+}
+
+/* 3. A imagem DENTRO do slide */
+#bannerCarousel .carousel-item img {
+    width: 100%;
+    height: 100%; /* Faz a imagem ter a altura do .carousel-item */
+    
+    /* * A MÁGICA: Isso impede a imagem de achatar ou esticar.
+     * Ela vai "cobrir" o espaço, cortando o excesso 
+     * (igual a uma foto de capa de perfil).
+     */
+    object-fit: cover; 
+    
+    /* Garante que o corte seja centralizado */
+    object-position: center center; 
+}
+
+/* 4. Mudar para a altura de 420px em telas maiores */
+/* 'md' (768px) é o breakpoint do Bootstrap onde suas imagens trocam */
+@media (min-width: 768px) {
+    #bannerCarousel .carousel-item {
+        /* A altura que você pediu para telas de tablet/desktop */
+        height: 420px; 
+    }
+}
