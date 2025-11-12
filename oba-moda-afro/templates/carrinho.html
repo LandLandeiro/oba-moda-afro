@@ -45,19 +45,21 @@
                             <br>
                             <small class="text-muted">Tamanho: {{ item.variation.size }}</small>
                         </td>
-
-                        {% if product.is_on_sale %}
-                            <span class="text-muted text-decoration-line-through">
-                                R$ {{ "%.2f"|format(product.price) }}
-                            </span>
-                            <span class="h3 fw-bold text-danger ms-2">
-                                R$ {{ "%.2f"|format(product.current_price) }}
-                            </span>
-                        {% else %}
-                            <span class="h3 fw-bold text-dark">
-                                R$ {{ "%.2f"|format(product.current_price) }}
-                            </span>
-
+                        
+                        <td class="fw-bold">
+                            {% if item.product.is_on_sale %}
+                                <span class="text-muted text-decoration-line-through d-block" style="font-size: 0.9rem;">
+                                    R$ {{ "%.2f"|format(item.product.price) }}
+                                </span>
+                                <span class="text-danger">
+                                    R$ {{ "%.2f"|format(item.product.current_price) }}
+                                </span>
+                            {% else %}
+                                <span>
+                                    R$ {{ "%.2f"|format(item.product.current_price) }}
+                                </span>
+                            {% endif %}
+                        </td>
                         <td style="width: 120px;">
                             <input type="number" 
                                    class="form-control" 
@@ -65,7 +67,9 @@
                                    max="{{ item.variation.stock }}" aria-label="Quantidade">
                         </td>
 
-                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(item.subtotal) }}</td> <td class="text-center">
+                        <td class="text-end fw-bold">R$ {{ "%.2f"|format(item.subtotal) }}</td>
+                        
+                        <td class="text-center">
                             <a href="{{ url_for('remover_do_carrinho', variation_id=item.variation.id) }}" class="btn btn-outline-danger btn-sm" title="Remover item">
                                 <i class="bi bi-trash"></i>
                             </a>
@@ -74,7 +78,9 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </div> <div class="row justify-content-end mt-4">
+        </div>
+        
+        <div class="row justify-content-end mt-4">
             <div class="col-md-6 col-lg-4">
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
