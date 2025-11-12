@@ -1,6 +1,6 @@
 # app.py
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from extensions import db, login_manager, bcrypt
+from extensions import db, login_manager, bcrypt, migrate # migrate foi importado
 from admin import init_admin
 from flask_ckeditor import CKEditor
 import math
@@ -32,6 +32,7 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     bcrypt.init_app(app)
+    migrate.init_app(app, db) # migrate foi inicializado
     CKEditor(app)
     init_admin(app) 
 
@@ -39,8 +40,9 @@ def create_app():
                         ProductSection, TextSection, Variation,
                         Category,
                         User,
-                        FooterLink,
-                        Order, SiteStat
+                        FooterLink, # <-- 1. IMPORTAR FooterLink
+                        Order, SiteStat,
+                        OrderItem
                         )
     
     @login_manager.user_loader
@@ -48,6 +50,7 @@ def create_app():
         """Função que o Flask-Login usa para recarregar o usuário da sessão."""
         return User.query.get(int(user_id))
 
+    # --- ATUALIZADO: CONTEXT PROCESSOR ---
     @app.context_processor
     def inject_global_data():
         header_categories = HeaderCategory.query.order_by(HeaderCategory.order).all()
@@ -57,14 +60,26 @@ def create_app():
         
         all_categories = Category.query.order_by(Category.name).all()
         
+        # --- 2. NOVA LÓGICA DO RODAPÉ ---
+        # Busca todos os links e os agrupa por coluna em um dicionário
+        footer_links_db = FooterLink.query.order_by(FooterLink.column, FooterLink.order).all()
+        footer_links_grouped = {}
+        for link in footer_links_db:
+            if link.column not in footer_links_grouped:
+                footer_links_grouped[link.column] = []
+            footer_links_grouped[link.column].append(link)
+        # --- FIM DA LÓGICA DO RODAPÉ ---
+
         return {
             'now': datetime.datetime.now(),
             'header_categories': header_categories,
             'math': math,
             'cart_item_count': cart_item_count,
             'all_categories': all_categories, 
-            'current_user': current_user
+            'current_user': current_user,
+            'footer_links': footer_links_grouped # <-- 3. ENVIA PARA O TEMPLATE
         }
+
     def get_stat(key):
         """Busca ou cria uma estatística e retorna o objeto."""
         stat = SiteStat.query.filter_by(key=key).first()
@@ -143,15 +158,13 @@ def create_app():
         cart_items = []
         total_price = 0
         
-        # Não vamos mais gerar a URL do zap aqui.
-        # Vamos gerar apenas o texto.
         whatsapp_message_lines = ["Olá! Gostaria de fazer o seguinte pedido:\n"]
         
         for var_id_str, quantity in cart_session.items():
-            # ... (código para calcular cart_items e total_price) ...
             variation = Variation.query.get(var_id_str)
             if variation:
                 product = variation.product
+                # Preço correto (com promoção)
                 subtotal = product.current_price * quantity
                 total_price += subtotal
                 
@@ -161,34 +174,29 @@ def create_app():
                     'quantity': quantity,
                     'subtotal': subtotal
                 })
-                # Adiciona ao texto da mensagem
                 whatsapp_message_lines.append(
                     f"- {quantity}x {product.name} (Tamanho: {variation.size}) - R$ {subtotal:.2f}"
                 )
 
         whatsapp_message_lines.append(f"\n*Total: R$ {total_price:.2f}*")
         
-        # Salva o texto da mensagem na sessão para a próxima rota usar
         session['whatsapp_message'] = "\n".join(whatsapp_message_lines)
         
         return render_template(
             'carrinho.html', 
             cart_items=cart_items, 
             total_price=total_price
-            # Removemos o whatsapp_url daqui
-        )
-        return render_template(
-            'carrinho.html', 
-            cart_items=cart_items, 
-            total_price=total_price,
-            whatsapp_url=whatsapp_url
         )
     
+    # --- ROTA DE CHECKOUT (CRIAR PEDIDO) ATUALIZADA ---
     @app.route('/checkout/criar-pedido', methods=['POST'])
     def criar_pedido():
         """
         Esta rota é chamada quando o usuário clica em "Finalizar Pedido".
-        Ela cria o "Lead" (Pedido) no banco antes de redirecionar ao WhatsApp.
+        1. Valida o estoque (previne race condition)
+        2. Subtrai o estoque
+        3. Cria o Pedido (Lead) e os OrderItems no banco
+        4. Redireciona ao WhatsApp.
         """
         cart_session = session.get('cart', {})
         whatsapp_message = session.get('whatsapp_message', 'Erro: Carrinho vazio.')
@@ -197,40 +205,88 @@ def create_app():
             flash('Seu carrinho está vazio.', 'warning')
             return redirect(url_for('carrinho'))
 
-        # Recalcula o preço total para segurança
-        total_price = 0
-        items_summary_list = []
+        # --- 1. PASSO DE VALIDAÇÃO (Checa estoque ANTES de subtrair) ---
         for var_id_str, quantity in cart_session.items():
             variation = Variation.query.get(var_id_str)
-            if variation:
-                total_price += variation.product.current_price * quantity
-                items_summary_list.append(f"{quantity}x {variation.product.name} ({variation.size})")
+            if not variation or variation.stock < quantity:
+                # Se alguém comprou o item enquanto ele estava no carrinho
+                flash(f'Desculpe, o item {variation.product.name} ({variation.size}) não tem mais {quantity} unidades em estoque. Por favor, ajuste seu carrinho.', 'danger')
+                return redirect(url_for('carrinho'))
 
-        items_summary_text = ", ".join(items_summary_list)
-        whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={url_escape(whatsapp_message)}"
-        
-        # 1. Cria o Pedido (Lead) no banco de dados
-        novo_pedido = Order(
-            total_price=total_price,
-            items_summary=items_summary_text,
-            whatsapp_url=whatsapp_url
-        )
-        db.session.add(novo_pedido)
-        
-        # 2. Incrementa a estatística de "checkout"
-        stat = get_stat('total_checkouts_whatsapp')
-        stat.value += 1
-        
-        db.session.commit()
-        
-        # 3. Limpa o carrinho
-        session.pop('cart', None)
-        session.pop('whatsapp_message', None)
-        session.modified = True
-        
-        # 4. Redireciona o usuário para o WhatsApp
-        flash('Seu pedido foi registrado! Estamos te redirecionando para o WhatsApp.', 'success')
-        return redirect(whatsapp_url)
+        # Se a validação passou, o estoque está garantido.
+
+        # --- 2. PASSO DE PROCESSAMENTO (Subtrai o estoque e cria o pedido) ---
+        try:
+            total_price = 0
+            
+            # Cria o Pedido (ainda sem preço total)
+            novo_pedido = Order(total_price=0, status='Pendente')
+            db.session.add(novo_pedido)
+            
+            items_for_message = [] # Para a msg do WhatsApp
+
+            for var_id_str, quantity in cart_session.items():
+                variation = Variation.query.get(var_id_str)
+                
+                # Preço "congelado" no momento da compra
+                price_at_time = variation.product.current_price
+                total_price += price_at_time * quantity
+                
+                # *** AQUI SUBTRAI O ESTOQUE ***
+                variation.stock -= quantity
+                db.session.add(variation)
+                
+                # Cria o OrderItem (o registro permanente do item)
+                new_item = OrderItem(
+                    order=novo_pedido, 
+                    variation=variation, 
+                    quantity=quantity, 
+                    price_per_item=price_at_time
+                )
+                db.session.add(new_item)
+                items_for_message.append(f"{quantity}x {variation.product.name} ({variation.size})")
+
+            # Agora atualiza o pedido com o preço final
+            novo_pedido.total_price = total_price
+            
+            # Monta a URL do WhatsApp com o ID do Pedido
+            whatsapp_message_lines = [
+                f"Olá! Gostaria de fazer o seguinte pedido:\n",
+                f"*(Nº do Pedido: {novo_pedido.id})*\n"
+            ]
+            for var_id_str, quantity in cart_session.items():
+                 variation = Variation.query.get(var_id_str)
+                 subtotal = variation.product.current_price * quantity
+                 whatsapp_message_lines.append(
+                    f"- {quantity}x {variation.product.name} (Tamanho: {variation.size}) - R$ {subtotal:.2f}"
+                 )
+            whatsapp_message_lines.append(f"\n*Total: R$ {total_price:.2f}*")
+            whatsapp_message = "\n".join(whatsapp_message_lines)
+
+            whatsapp_url = f"https://wa.me/{WHATSAPP_NUMBER}?text={url_escape(whatsapp_message)}"
+            novo_pedido.whatsapp_url = whatsapp_url
+            
+            # 3. Incrementa a estatística de "checkout"
+            stat = get_stat('total_checkouts_whatsapp')
+            stat.value += 1
+            
+            # 4. Salva tudo no banco
+            db.session.commit()
+            
+            # 5. Limpa o carrinho
+            session.pop('cart', None)
+            session.pop('whatsapp_message', None)
+            session.modified = True
+            
+            # 6. Redireciona o usuário para o WhatsApp
+            flash(f'Seu pedido (Nº {novo_pedido.id}) foi registrado! Estamos te redirecionando para o WhatsApp.', 'success')
+            return redirect(whatsapp_url)
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Ocorreu um erro ao processar seu pedido: {e}. Tente novamente.', 'danger')
+            return redirect(url_for('carrinho'))
+
     
     @app.route('/carrinho/adicionar/<int:produto_id>', methods=['POST'])
     def adicionar_carrinho(produto_id):
@@ -244,8 +300,12 @@ def create_app():
              flash('Por favor, selecione um tamanho.', 'danger')
              return redirect(url_for('produto_detalhe', slug=produto.slug))
         
-        # ... (try/except para quantity) ...
-        quantity = 1 # (seu código de quantity)
+        try:
+            quantity = int(request.form.get('quantity', 1))
+            if quantity < 1:
+                quantity = 1
+        except (ValueError, TypeError):
+            quantity = 1
 
         variacao = Variation.query.get(variation_id)
         if not variacao or variacao.product_id != produto.id:
@@ -257,7 +317,7 @@ def create_app():
         total_wanted = current_in_cart + quantity
 
         if total_wanted > variacao.stock:
-            flash(f'Desculpe, temos apenas {variacao.stock} unidades de {produto.name} ({variacao.size}) em estoque.', 'danger')
+            flash(f'Desculpe, temos apenas {variacao.stock} unidades de {produto.name} ({variacao.size}) em estoque. (Você já tem {current_in_cart} no carrinho).', 'danger')
         else:
             session['cart'][var_id_str] = total_wanted
             session.modified = True 
@@ -345,6 +405,6 @@ def create_app():
 # --- Bloco de Execução Principal ---
 if __name__ == '__main__':
     app = create_app()
-    with app.app_context():
-        db.create_all()
+    # Não precisamos mais do db.create_all() aqui
+    # O Flask-Migrate cuida disso
     app.run(debug=True, port=5001)
