@@ -4,8 +4,8 @@ from extensions import db, bcrypt
 from models import User
 
 # Configure o email e senha do seu admin
-ADMIN_EMAIL = "admin@loja.com"
-ADMIN_PASSWORD = "admin123" # <-- Mude isso para uma senha forte!
+ADMIN_EMAIL = "obaafro1@gmail.com"
+ADMIN_PASSWORD = "Ob4afr0" 
 
 app = create_app()
 
@@ -19,7 +19,7 @@ with app.app_context():
     else:
         # Cria o novo usuário
         new_admin = User(email=ADMIN_EMAIL)
-        new_admin.set_password(ADMIN_PASSWORD) # A senha será criptografada
+        new_admin.set_password(ADMIN_PASSWORD) 
         
         db.session.add(new_admin)
         db.session.commit()
