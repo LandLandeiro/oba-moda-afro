@@ -16,19 +16,18 @@
         <div class="col-md-6">
             <h1>{{ produto.name }}</h1>
             
-            {% if product.is_on_sale %}
+            {% if produto.is_on_sale %}
                 <span class="text-muted text-decoration-line-through">
-                    R$ {{ "%.2f"|format(product.price) }}
+                    R$ {{ "%.2f"|format(produto.price) }}
                 </span>
                 <span class="h3 fw-bold text-danger ms-2">
-                    R$ {{ "%.2f"|format(product.current_price) }}
+                    R$ {{ "%.2f"|format(produto.current_price) }}
                 </span>
             {% else %}
                 <span class="h3 fw-bold text-dark">
-                    R$ {{ "%.2f"|format(product.current_price) }}
+                    R$ {{ "%.2f"|format(produto.current_price) }}
                 </span>
-
-            <div class="mb-3">
+            {% endif %} <div class="mb-3">
                 {% if produto.categories %}
                 <span class="text-muted">Categoria:</span>
                 <a href="{{ url_for('categoria_produtos', slug=produto.categories[0].slug) }}" class="text-decoration-none fw-bold">{{ produto.categories[0].name }}</a>
