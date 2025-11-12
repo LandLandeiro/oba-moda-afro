@@ -23,7 +23,8 @@ from models import (
     Variation, Category,
     FooterLink,
     Product, Promotion,
-    Order, SiteStat
+    Order, SiteStat,
+    OrderItem
 )
 
 # --- Configuração do Caminho de Upload ---
@@ -144,19 +145,40 @@ class SecureAdminIndexView(AdminIndexView):
                                  ).all()
             
             dados_receita_linha = {
-                'labels': [datetime.strptime(d[0], '%Y-%m-%d').strftime('%d/%m') for d in receita_por_dia_raw],
+                'labels': [ (datetime.strptime(d[0], '%Y-%m-%d') if isinstance(d[0], str) else d[0]).strftime('%d/%m') for d in receita_por_dia_raw ],
                 'data': [float(d[1]) for d in receita_por_dia_raw]
             }
             
-            top_produtos = Product.query.filter(Product.cart_add_count > 0)\
-                                  .order_by(Product.cart_add_count.desc())\
-                                  .limit(5).all()
-            dados_produtos_carrinho = {
-                'labels': [p.name for p in top_produtos],
-                'data': [p.cart_add_count for p in top_produtos]
-            }
+            # --- CÓDIGO REMOVIDO ---
+            # O gráfico 'top_produtos' foi removido do template, 
+            # então não precisamos mais calcular isso.
+            # --- FIM DA REMOÇÃO ---
 
-            # 5. ENVIAR DADOS PARA O TEMPLATE
+            # --- LÓGICA DE GESTÃO DE ESTOQUE ---
+            LOW_STOCK_THRESHOLD = 5
+            
+            all_active_products = Product.query.filter_by(active=True).all()
+            
+            low_stock_products = [
+                p for p in all_active_products
+                if p.total_stock > 0 and p.total_stock <= LOW_STOCK_THRESHOLD
+            ]
+            
+            out_of_stock_products_inactive = Product.query.filter_by(active=False).all()
+            out_of_stock_products_active = [
+                p for p in all_active_products
+                if p.total_stock == 0
+            ]
+            
+            out_of_stock_products = out_of_stock_products_active + out_of_stock_products_inactive
+            
+            low_stock_count = len(low_stock_products)
+            out_of_stock_count = len(out_of_stock_products)
+            
+            url_filtro_esgotados = url_for('product.index_view') + '?flt2_0=False'
+            # --- FIM DA LÓGICA DE ESTOQUE ---
+
+            # 5. ENVIAR DADOS PARA O TEMPLATE 
             template_args.update({
                 'start_date_str': start_date_str,
                 'end_date_str': end_date_str,
@@ -166,19 +188,35 @@ class SecureAdminIndexView(AdminIndexView):
                 'taxa_conversao': taxa_conversao,
                 'dados_status_pizza': dados_status_pizza,
                 'dados_receita_linha': dados_receita_linha,
-                'dados_produtos_carrinho': dados_produtos_carrinho
+                # 'dados_produtos_carrinho' removido
+                
+                'low_stock_count': low_stock_count,
+                'out_of_stock_count': out_of_stock_count,
+                'low_stock_products': sorted(low_stock_products, key=lambda p: p.total_stock), 
+                'out_of_stock_products': sorted(out_of_stock_products, key=lambda p: p.name), 
+                'url_filtro_esgotados': url_filtro_esgotados 
             })
 
         # --- 6. 'EXCEPT' CORRIGIDO E PAREADO ---
         except Exception as e:
+            # Mostra o erro real no log do console (ajuda a debugar)
+            print(f"!!!!!!!!!! ERRO AO CARREGAR O DASHBOARD: {e} !!!!!!!!!!")
+            
             flash(f'Erro ao carregar o dashboard: {e}', 'danger')
             template_args.update({
                 'start_date_str': start_date_str, 'end_date_str': end_date_str,
-                'receita_total': 0, 'total_leads': 0,
-                'total_vendas_concluidas': 0, 'taxa_conversao': 0,
-                'dados_status_pizza': {'labels': [], 'data': []},
+                'receita_total': receita_total, # Os KPIs (calculados antes) ainda podem aparecer
+                'total_leads': total_leads,
+                'total_vendas_concluidas': total_vendas_concluidas,
+                'taxa_conversao': taxa_conversao,
+                'dados_status_pizza': {'labels': [], 'data': []}, # Gráficos são zerados
                 'dados_receita_linha': {'labels': [], 'data': []},
-                'dados_produtos_carrinho': {'labels': [], 'data': []}
+                
+                'low_stock_count': 0,
+                'out_of_stock_count': 0,
+                'low_stock_products': [],
+                'out_of_stock_products': [], 
+                'url_filtro_esgotados': url_for('product.index_view') 
             })
         
         # --- 7. RENDERIZAR NO FINAL ---
@@ -186,6 +224,9 @@ class SecureAdminIndexView(AdminIndexView):
             self._template,
             **template_args
         )
+
+# ... (O resto do arquivo: CategoryView, ProductView, etc. permanece igual) ...
+
 class HeaderCategoryView(SecureModelView):
     form_columns = ('name', 'category', 'order')
     column_list = ('name', 'category', 'order')
@@ -259,7 +300,8 @@ class ProductView(SecureModelView):
     form_columns = ('name', 'categories', 'description', 'price',  'image', 'active', 'slug', 'sections')
     
     column_searchable_list = ('name',) 
-    column_filters = ('categories', 'sections', 'active')
+    # A ordem aqui é crucial: [0]categories, [1]sections, [2]active
+    column_filters = ('categories', 'sections', 'active') 
 
     inline_models = [(Variation, {
         'form_label': 'Variação',
@@ -440,11 +482,22 @@ class ProductSectionView(SecureModelView):
         # O 'super()' deve ser chamado apenas uma vez, no final.
         super().on_model_change(form, model, is_created)
 
+# --- NOVO: OrderItemView (Apenas para o admin) ---
+class OrderItemView(SecureModelView):
+    """Visualização para os Itens do Pedido (apenas leitura)"""
+    can_create = False
+    can_edit = False
+    can_delete = False
+    
+    column_list = ['order', 'variation', 'quantity', 'price_per_item']
+
+
+# --- ATUALIZADO: OrderView (Com lógica de restock) ---
 class OrderView(SecureModelView):
     """Visualização para os Pedidos/Leads"""
     can_create = True # criar pedidos manualmente
-    can_edit = True   # Não editar pedidos
-    can_delete = True  # Pode apagar pedidos antigos
+    can_edit = True
+    can_delete = True
 
     form_choices = {
         'status': [
@@ -454,12 +507,72 @@ class OrderView(SecureModelView):
         ]
     }
 
+    # Mostra os itens do pedido direto na página de edição
+    inline_models = (OrderItemView(OrderItem, db.session, name="Itens do Pedido"),)
+
     column_editable_list = ['status']
     
-    column_list = ('id', 'status','created_at', 'total_price', 'items_summary', 'whatsapp_url')
+    # 'items_summary' agora é uma @property, funciona na lista!
+    column_list = ('id', 'status','created_at', 'total_price', 'items_summary', 'restocked', 'whatsapp_url')
+    
+    # 'restocked' não deve ser editável no formulário principal
+    form_columns = ('status', 'created_at', 'total_price', 'whatsapp_url')
+    
     column_default_sort = ('created_at', True) # Ordenar por mais novo
-    column_searchable_list = ('items_summary',)
-    column_filters = ('created_at', 'total_price')
+    column_searchable_list = ('order_items.variation.product.name',) # Permite buscar pelo nome do produto
+    column_filters = ('created_at', 'total_price', 'status', 'restocked')
+
+    def on_model_change(self, form, model, is_created):
+        """
+        Esta é a lógica de RESTOCK.
+        É acionada sempre que um Pedido é salvo no admin.
+        """
+        if not is_created and 'status' in form.data:
+            
+            # --- LÓGICA DE CANCELAMENTO ---
+            # Se o novo status é 'Cancelado' E o estoque ainda não foi devolvido
+            if model.status == 'Cancelado' and not model.restocked:
+                try:
+                    for item in model.order_items:
+                        if item.variation:
+                            item.variation.stock += item.quantity
+                            db.session.add(item.variation)
+                            flash(f"Estoque devolvido: {item.quantity}x {item.variation.product.name} ({item.variation.size})", "success")
+                    
+                    # Marca que o estoque deste pedido foi devolvido
+                    model.restocked = True
+                    
+                except Exception as e:
+                    flash(f"Erro ao devolver o estoque: {e}", "danger")
+
+            # --- LÓGICA DE RE-SUBTRAÇÃO (Opcional, mas seguro) ---
+            # Se o status MUDOU DE 'Cancelado' para outra coisa (ex: Pendente)
+            # E o estoque JÁ TINHA SIDO devolvido
+            elif model.status != 'Cancelado' and model.restocked:
+                try:
+                    # Checa se há estoque ANTES de subtrair de novo
+                    for item in model.order_items:
+                        if item.variation and item.variation.stock < item.quantity:
+                            flash(f"Não foi possível re-subtrair estoque para {item.variation.product.name}. Estoque insuficiente.", "error")
+                            # Impede a mudança de status
+                            model.status = 'Cancelado' 
+                            return super().on_model_change(form, model, is_created)
+
+                    # Se todos os itens têm estoque, subtrai
+                    for item in model.order_items:
+                        if item.variation:
+                            item.variation.stock -= item.quantity
+                            db.session.add(item.variation)
+                            flash(f"Estoque re-subtraído: {item.quantity}x {item.variation.product.name} ({item.variation.size})", "warning")
+                    
+                    # Marca que o estoque não está mais devolvido
+                    model.restocked = False
+
+                except Exception as e:
+                    flash(f"Erro ao re-subtrair o estoque: {e}", "danger")
+
+        super().on_model_change(form, model, is_created)
+
 
 class SiteStatView(SecureModelView):
     """Visualização para as Estatísticas"""
@@ -498,8 +611,13 @@ def init_admin(app):
                    menu_icon_value='fa-file-text-alt'))
     admin.add_view(FooterLinkView(FooterLink, db.session, name='Links (Rodapé)',
                    menu_icon_value='fa-link'))
+    
+    # ATUALIZADO: Agrupando os Pedidos
     admin.add_view(OrderView(Order, db.session, name='Pedidos (Leads)',
-                   menu_icon_value='fa-money'))
+                   category='Vendas', menu_icon_value='fa-money'))
+    admin.add_view(OrderItemView(OrderItem, db.session, name='Itens dos Pedidos',
+                   category='Vendas', menu_icon_value='fa-shopping-basket'))
+    
     admin.add_view(SiteStatView(SiteStat, db.session, name='Estatísticas',
                    menu_icon_value='fa-bar-chart'))
     admin.add_view(PromotionView(Promotion, db.session, name='Promoções (Campanhas)',
