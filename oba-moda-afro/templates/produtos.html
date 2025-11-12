@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
-{% block title %}Todos os Produtos - Loja Virtual{% endblock %}
+{% block title %}Produtos - Loja Virtual{% endblock %}
 
 {% block content %}
 <div class="container py-5">
-    <h1 class="text-center mb-4 section-title">Todos os Produtos</h1>
+    <h1 class="text-center mb-4 section-title">Nossos Produtos</h1>
     
     <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-4">
         {% for produto in produtos %}
@@ -21,7 +21,19 @@
                     <h5 class="card-title fs-6">
                         <a href="{{ url_for('produto_detalhe', slug=produto.slug) }}" class="text-decoration-none text-dark">{{ produto.name }}</a>
                     </h5>
-                    <p class="card-text fw-bold">R$ {{ "%.2f"|format(produto.price)|replace('.', ',') }}</p>
+                    
+                    {% if produto.is_on_sale %}
+                        <span class="card-text text-muted text-decoration-line-through small">
+                            R$ {{ "%.2f"|format(produto.price)|replace('.', ',') }}
+                        </span>
+                        <span class="card-text fw-bold text-danger d-block">
+                            R$ {{ "%.2f"|format(produto.current_price)|replace('.', ',') }}
+                        </span>
+                    {% else %}
+                        <p class="card-text fw-bold">
+                            R$ {{ "%.2f"|format(produto.current_price)|replace('.', ',') }}
+                        </p>
+                    {% endif %}
                     
                     {% if produto.total_stock > 0 %}
                         <a href="{{ url_for('produto_detalhe', slug=produto.slug) }}" class="btn btn-primary btn-sm">
