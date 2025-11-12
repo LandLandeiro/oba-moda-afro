@@ -7,3 +7,5 @@ Flask-CKEditor
 python-slugify
 SQLAlchemy
 WTForms
+Flask-Migrate
+bleach
