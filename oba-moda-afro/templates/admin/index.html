@@ -65,7 +65,32 @@
             </div>
         </div>
 
-    </div> <div class="row mb-4">
+    </div>
+    
+    <h2 class="h4">Gestão de Estoque</h2>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <a href="#lista-baixo-estoque" class="text-decoration-none">
+                <div class="card text-white bg-warning mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Baixo Estoque (1-5 unid.)</h5>
+                        <p class="card-text fs-2 fw-bold">{{ low_stock_count }}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_filtro_esgotados }}" target="_blank" class="text-decoration-none">
+                <div class="card text-white bg-danger mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">Produtos Esgotados (Inativos)</h5>
+                        <p class="card-text fs-2 fw-bold">{{ out_of_stock_count }}</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+    <div class="row mb-4">
         <div class="col">
             <div class="card">
                 <div class="card-header">
@@ -80,9 +105,11 @@
                 </div>
             </div>
         </div>
-    </div> <div class="row">
+    </div>
+    
+    <div class="row">
         
-        <div class="col-md-6">
+        <div class="col-md-4">
             <div class="card">
                 <div class="card-header">
                     Status dos Pedidos (Leads) no Período
@@ -97,35 +124,76 @@
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card">
+        <div class="col-md-4">
+            <div class="card" id="lista-baixo-estoque">
                 <div class="card-header">
-                    Top 5 Produtos (Adicionados ao Carrinho - All-Time)
+                    Itens com Baixo Estoque (1-5 unidades)
                 </div>
-                <div class="card-body">
-                    {% if dados_produtos_carrinho.data %}
-                        <canvas id="graficoProdutosCarrinho"></canvas>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if low_stock_products %}
+                        <ul class="list-group list-group-flush">
+                        {% for product in low_stock_products %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="{{ url_for('product.edit_view', id=product.id) }}" target="_blank">
+                                    {{ product.name }}
+                                </a>
+                                <span class="badge bg-warning rounded-pill">{{ product.total_stock }} unid.</span>
+                            </li>
+                        {% endfor %}
+                        </ul>
                     {% else %}
-                        <p class="text-center text-muted">Nenhum produto foi adicionado ao carrinho ainda.</p>
+                        <p class="text-center text-muted">Nenhum produto com baixo estoque. Bom trabalho!</p>
                     {% endif %}
                 </div>
             </div>
         </div>
-    </div> </div> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    Itens Esgotados (Inativos ou 0)
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if out_of_stock_products %}
+                        <ul class="list-group list-group-flush">
+                        {% for product in out_of_stock_products %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="{{ url_for('product.edit_view', id=product.id) }}" target="_blank">
+                                    {{ product.name }}
+                                </a>
+                                <span class="badge bg-danger rounded-pill">0 unid.</span>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-center text-muted">Nenhum produto esgotado.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        </div> 
+</div> 
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
         // --- GRÁFICO 1: RECEITA (Linha) ---
         const ctxLinha = document.getElementById('graficoReceitaLinha');
-        if (ctxLinha) {
+        // Passa os dados do Jinja para variáveis JS
+        const receitaLabels = {{ dados_receita_linha.labels | tojson }};
+        const receitaData = {{ dados_receita_linha.data | tojson }};
+
+        // Checa o comprimento da variável JS
+        if (ctxLinha && receitaData.length > 0) {
             new Chart(ctxLinha, {
                 type: 'line',
                 data: {
-                    labels: {{ dados_receita_linha.labels | tojson }},
+                    labels: receitaLabels,
                     datasets: [{
                         label: 'Receita R$',
-                        data: {{ dados_receita_linha.data | tojson }},
+                        data: receitaData,
                         fill: false,
                         borderColor: 'rgb(75, 192, 192)',
                         tension: 0.1
@@ -136,45 +204,33 @@
 
         // --- GRÁFICO 2: STATUS (Pizza) ---
         const ctxStatus = document.getElementById('graficoStatusPizza');
-        if (ctxStatus) {
+        // Passa os dados do Jinja para variáveis JS
+        const statusLabels = {{ dados_status_pizza.labels | tojson }};
+        const statusData = {{ dados_status_pizza.data | tojson }};
+
+        // Checa o comprimento da variável JS
+        if (ctxStatus && statusData.length > 0) {
             new Chart(ctxStatus, {
                 type: 'pie',
                 data: {
-                    labels: {{ dados_status_pizza.labels | tojson }},
+                    labels: statusLabels,
                     datasets: [{
                         label: 'Pedidos',
-                        data: {{ dados_status_pizza.data | tojson }},
+                        data: statusData,
                         backgroundColor: [
                             'rgb(255, 205, 86)', // Pendente (Amarelo)
                             'rgb(75, 192, 192)', // Concluído (Verde)
                             'rgb(255, 99, 132)'  // Cancelado (Vermelho)
                         ]
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true
                 }
             });
         }
 
-        // --- GRÁFICO 3: PRODUTOS (Rosquinha) ---
-        const ctxProdutos = document.getElementById('graficoProdutosCarrinho');
-        if (ctxProdutos) {
-            new Chart(ctxProdutos, {
-                type: 'doughnut',
-                data: {
-                    labels: {{ dados_produtos_carrinho.labels | tojson }},
-                    datasets: [{
-                        label: 'Nº de Adições ao Carrinho',
-                        data: {{ dados_produtos_carrinho.data | tojson }},
-                        backgroundColor: [
-                            'rgb(255, 99, 132)',
-                            'rgb(54, 162, 235)',
-                            'rgb(255, 205, 86)',
-                            'rgb(75, 192, 192)',
-                            'rgb(153, 102, 255)'
-                        ]
-                    }]
-                }
-            });
-        }
     });
 </script>
 
